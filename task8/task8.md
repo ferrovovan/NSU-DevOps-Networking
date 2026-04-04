@@ -11,6 +11,22 @@
 Нужно подружить VPN (запретное слово) со своим ПК.
 Гери -> VPN сервер -> VPN клиент -> наш Nginx
 ```
+Что будет?
+1. Вам дадут арендованный сервак (Ubuntu)
+2. Которым будут пользоваться все. Поэтому будьте терпимыми.
+
+Рекомендую установить `fish`, чтоб не париться:
+```
+apt install -y fish
+
+fish  # зайти в крутой терминал
+```
+
+И здесь показан проброс через reverse-ssh, 
+  но по хорошему нужно настроить WireGuard.
+
+## Выполнение задания
+Чтобы не заморачиться, проще всем использовать блокировку по адресам
 
 ### 1. Устанавливаем nginx
 ```
@@ -18,36 +34,48 @@ sudo apt update && sudo apt install nginx   # для Debian/Ubuntu
 sudo systemctl enable --now nginx
 ```
 
-### 2. Создаём точку проксирования
+### 2. Создаём _свою_ точку проксирования
 `nano /etc/nginx/conf.d/hacker-news.conf`
 
 ```
 server {
-
         location /hacker-news/ {  # обязательно в конце с чертой [/]!
-                if ($forbidden_country) {
-                        # return 403 "Доступ из вашего региона ограничен.";
+                if ($is_ru = 1) {
                         return 302 http://google.com;
                 }
 
-                #rewrite ^/hacker-news(.*)$ $1 break;  # Другой способ
-                proxy_pass http://127.0.0.1:8007/;
+                proxy_pass http://127.0.0.1:8007/;  # <-- Своя точка!
 
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                 proxy_set_header X-Forwarded-Prefix /hacker-news;
-
         }
 }
 ```
 
-### 3.
+### 3. Главный конфиг
+`/etc/nginx/nginx.conf`
+```
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+error_log /var/log/nginx/error.log;
+include /etc/nginx/modules-enabled/*.conf;
+
+events {
+        worker_connections 768;
+}
+
+# УМОЛЯЮ, НЕ МЕНЯЙТЕ ЗДЕСЬ НИЧЕГО
+# ВСЕ ИЗМЕНЕНИЯ ДЕЛАТЬ В ЛИЧНЫХ ФАЙЛАХ /etc/nginx/conf.d/
+
 http {
+	# Общие настройки сервера
         server {
                 listen 80;  server_name _;
-                root /etc/nginx/html;
-                error_page 403 /placeholder.html;
+                root /etc/nginx/;
+                error_page 403 /html/placeholder.html;
                 location = /placeholder.html {
                         internal;
                 }
@@ -60,6 +88,7 @@ http {
         include /etc/nginx/conf.d/*.conf;  # <-- Прошлое задание
 }
 ```
+ Не забудьте прописать `ru_ips.txt` и `placeholder.html`.
 
 ### 4. API-точка
 Проверяем, чтобы в API-точке была запись
@@ -74,7 +103,7 @@ app = FastAPI(
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-### 6. Настройка SSH‑сервера
+### 6. Настройка SSH‑сервера (проброс порта)
 #### 1. GatewayPorts
 В файле /etc/ssh/sshd_config убедитесь, что присутствует (или добавьте) строка:
 ```
@@ -90,5 +119,6 @@ ssh -R 8007:localhost:80 user@<vps_ip> -N -f
 ```
 
 ### 7. Применение
+Не забудьте запустить 7-е задание и включить ssh-туннель!
 Теперь  можно спокойно переходить на
 `http://{ip}/hacker-news/docs`
