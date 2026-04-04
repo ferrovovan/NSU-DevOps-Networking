@@ -1,0 +1,5 @@
+google.com
+microsoft.com
+gnu.org
+mozilla.org
+www.glitchprod.com
